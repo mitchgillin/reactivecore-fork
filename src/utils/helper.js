@@ -1,15 +1,15 @@
 // when we want to perform deep equality check, especially in objects
-import dateFormats from './dateFormats';
-import getSuggestions from './suggestions';
+import dateFormats from "./dateFormats";
+import getSuggestions from "./suggestions";
 
 export const updateCustomQuery = (componentId, props, value) => {
-	if (props.customQuery && typeof props.customQuery === 'function') {
+	if (props.customQuery && typeof props.customQuery === "function") {
 		props.setCustomQuery(componentId, props.customQuery(value, props));
 	}
 };
 
 export const updateDefaultQuery = (componentId, props, value) => {
-	if (props.defaultQuery && typeof props.defaultQuery === 'function') {
+	if (props.defaultQuery && typeof props.defaultQuery === "function") {
 		props.setDefaultQuery(componentId, props.defaultQuery(value, props));
 	}
 };
@@ -18,13 +18,20 @@ export function isEqual(x, y) {
 	if (x === y) return true;
 	if (!(x instanceof Object) || !(y instanceof Object)) return false;
 	if (x.constructor !== y.constructor) return false;
-
+	if (
+		typeof x === "object" &&
+		typeof y === "object" &&
+		!Array.isArray(x) &&
+		!Array.isArray(y)
+	) {
+		return JSON.stringify(x) === JSON.stringify(y);
+	}
 	/* eslint-disable */
 	for (const p in x) {
 		if (!x.hasOwnProperty(p)) continue;
 		if (!y.hasOwnProperty(p)) return false;
 		if (x[p] === y[p]) continue;
-		if (typeof x[p] !== 'object') return false;
+		if (typeof x[p] !== "object") return false;
 		if (!isEqual(x[p], y[p])) return false;
 	}
 
@@ -68,18 +75,21 @@ export function getQueryOptions(props) {
 }
 
 function getOperation(conjunction) {
-	if (conjunction === 'and') {
-		return 'must';
+	if (conjunction === "and") {
+		return "must";
 	}
-	if (conjunction === 'or') {
-		return 'should';
+	if (conjunction === "or") {
+		return "should";
 	}
-	return 'must_not';
+	return "must_not";
 }
 
 function createBoolQuery(operation, query) {
 	let resultQuery = null;
-	if ((Array.isArray(query) && query.length) || (!Array.isArray(query) && query)) {
+	if (
+		(Array.isArray(query) && query.length) ||
+		(!Array.isArray(query) && query)
+	) {
 		resultQuery = {
 			bool: {
 				[operation]: query,
@@ -87,7 +97,7 @@ function createBoolQuery(operation, query) {
 		};
 	}
 
-	if (operation === 'should' && resultQuery) {
+	if (operation === "should" && resultQuery) {
 		resultQuery = {
 			bool: {
 				...resultQuery.bool,
@@ -105,7 +115,7 @@ function getQuery(react, queryList) {
 			const operation = getOperation(conjunction);
 			const queryArr = react[conjunction]
 				.map((comp) => {
-					if (typeof comp !== 'string') {
+					if (typeof comp !== "string") {
 						// in this case, we have { <conjunction>: <> } objects inside the array
 						return getQuery(comp, queryList);
 					} else if (comp in queryList) {
@@ -113,19 +123,25 @@ function getQuery(react, queryList) {
 					}
 					return null;
 				})
-				.filter(item => !!item);
+				.filter((item) => !!item);
 
 			const boolQuery = createBoolQuery(operation, queryArr);
 			if (boolQuery) {
 				query = [...query, boolQuery];
 			}
-		} else if (typeof react[conjunction] === 'string') {
+		} else if (typeof react[conjunction] === "string") {
 			const operation = getOperation(conjunction);
-			const boolQuery = createBoolQuery(operation, queryList[react[conjunction]]);
+			const boolQuery = createBoolQuery(
+				operation,
+				queryList[react[conjunction]]
+			);
 			if (boolQuery) {
 				query = [...query, boolQuery];
 			}
-		} else if (typeof react[conjunction] === 'object' && react[conjunction] !== null) {
+		} else if (
+			typeof react[conjunction] === "object" &&
+			react[conjunction] !== null
+		) {
 			const boolQuery = getQuery(react[conjunction], queryList);
 			if (boolQuery) {
 				query = [...query, boolQuery];
@@ -156,14 +172,14 @@ function getExternalQueryOptions(react, options, component) {
 					queryOptions = { ...queryOptions, ...options[comp] };
 				}
 			});
-		} else if (typeof react[conjunction] === 'string') {
+		} else if (typeof react[conjunction] === "string") {
 			if (options[react[conjunction]]) {
 				queryOptions = { ...queryOptions, ...options[react[conjunction]] };
 			}
 		} else if (
-			typeof react[conjunction] === 'object'
-			&& react[conjunction] !== null
-			&& !Array.isArray(react[conjunction])
+			typeof react[conjunction] === "object" &&
+			react[conjunction] !== null &&
+			!Array.isArray(react[conjunction])
 		) {
 			queryOptions = {
 				...queryOptions,
@@ -183,7 +199,11 @@ export function buildQuery(component, dependencyTree, queryList, queryOptions) {
 
 	if (component in dependencyTree) {
 		queryObj = getQuery(dependencyTree[component], queryList);
-		options = getExternalQueryOptions(dependencyTree[component], queryOptions, component);
+		options = getExternalQueryOptions(
+			dependencyTree[component],
+			queryOptions,
+			component
+		);
 	}
 	return { queryObj, options };
 }
@@ -194,7 +214,7 @@ export function pushToAndClause(reactProp, component) {
 		if (Array.isArray(react.and)) {
 			react.and = [...react.and, component];
 			return react;
-		} else if (typeof react.and === 'string') {
+		} else if (typeof react.and === "string") {
 			react.and = [react.and, component];
 			return react;
 		}
@@ -205,7 +225,12 @@ export function pushToAndClause(reactProp, component) {
 }
 
 // checks and executes beforeValueChange for sensors
-export function checkValueChange(componentId, value, beforeValueChange, performUpdate) {
+export function checkValueChange(
+	componentId,
+	value,
+	beforeValueChange,
+	performUpdate
+) {
 	let selectedValue = value;
 	// To ensure that the returned values are consistent across all the components
 	// null is returned in case of an empty array
@@ -213,7 +238,10 @@ export function checkValueChange(componentId, value, beforeValueChange, performU
 		selectedValue = null;
 	}
 	const handleError = (e) => {
-		console.warn(`${componentId} - beforeValueChange rejected the promise with `, e);
+		console.warn(
+			`${componentId} - beforeValueChange rejected the promise with `,
+			e
+		);
 	};
 
 	if (beforeValueChange) {
@@ -233,9 +261,9 @@ export function checkValueChange(componentId, value, beforeValueChange, performU
 }
 
 export function getAggsOrder(sortBy) {
-	if (sortBy === 'count') {
+	if (sortBy === "count") {
 		return {
-			_count: 'desc',
+			_count: "desc",
 		};
 	}
 	return {
@@ -253,16 +281,24 @@ export const checkPropChange = (prevProp, nextProp, callback) => {
 };
 
 // checks for any prop change in the propsList and invokes the callback
-export const checkSomePropChange = (prevProps = {}, nextProps = {}, propsList, callback) => {
-	propsList.some(prop => checkPropChange(prevProps[prop], nextProps[prop], callback));
+export const checkSomePropChange = (
+	prevProps = {},
+	nextProps = {},
+	propsList,
+	callback
+) => {
+	propsList.some((prop) =>
+		checkPropChange(prevProps[prop], nextProps[prop], callback)
+	);
 };
 
-export const getClassName = (classMap, component) => (classMap && classMap[component]) || '';
+export const getClassName = (classMap, component) =>
+	(classMap && classMap[component]) || "";
 
 export const getInnerKey = (obj, key) => (obj && obj[key]) || {};
 
 export const handleA11yAction = (e, callback) => {
-	if (e.key === 'Enter' || e.key === ' ') {
+	if (e.key === "Enter" || e.key === " ") {
 		e.preventDefault();
 		callback();
 	}
@@ -273,7 +309,9 @@ const highlightResults = (result) => {
 	if (data.highlight) {
 		Object.keys(data.highlight).forEach((highlightItem) => {
 			const highlightValue = data.highlight[highlightItem][0];
-			data._source = Object.assign({}, data._source, { [highlightItem]: highlightValue });
+			data._source = Object.assign({}, data._source, {
+				[highlightItem]: highlightValue,
+			});
 		});
 	}
 	return data;
@@ -294,7 +332,7 @@ export const parseHits = (hits, showHighlighted = true) => {
 			let data = { ...item };
 			if (showHighlighted) data = highlightResults(item);
 			const result = Object.keys(data)
-				.filter(key => key !== '_source')
+				.filter((key) => key !== "_source")
 				.reduce(
 					(obj, key) => {
 						// eslint-disable-next-line
@@ -305,7 +343,7 @@ export const parseHits = (hits, showHighlighted = true) => {
 						highlight: data.highlight || {},
 						...data._source,
 						...streamProps,
-					},
+					}
 				);
 			return result;
 		});
@@ -318,9 +356,9 @@ export function formatDate(date, props) {
 		return props.parseDate(date, props);
 	}
 	switch (props.queryFormat) {
-		case 'epoch_millis':
+		case "epoch_millis":
 			return date.getTime();
-		case 'epoch_seconds':
+		case "epoch_seconds":
 			return Math.floor(date.getTime() / 1000);
 		default: {
 			if (dateFormats[props.queryFormat]) {
@@ -353,7 +391,8 @@ function computeResultStats(hits, searchState, promotedResults) {
 				...searchState[componentId].resultStats,
 				numberOfResults: total,
 				time,
-				promoted: promotedResults[componentId] && promotedResults[componentId].length,
+				promoted:
+					promotedResults[componentId] && promotedResults[componentId].length,
 				hidden: hidden || 0,
 			},
 		};
@@ -407,17 +446,17 @@ export const getSearchState = (state = {}, forHeaders = false) => {
 	});
 	if (!forHeaders) {
 		populateState(queryLog);
-		populateState(hits, 'hits');
-		populateState(aggregations, 'aggregations');
-		populateState(isLoading, 'isLoading');
-		populateState(error, 'error');
-		populateState(promotedResults, 'promotedData');
-		populateState(settings, 'settings');
-		populateState(customData, 'customData');
-		populateState(rawData, 'rawData');
+		populateState(hits, "hits");
+		populateState(aggregations, "aggregations");
+		populateState(isLoading, "isLoading");
+		populateState(error, "error");
+		populateState(promotedResults, "promotedData");
+		populateState(settings, "settings");
+		populateState(customData, "customData");
+		populateState(rawData, "rawData");
 		computeResultStats(hits, searchState, promotedResults);
 	}
-	populateState(dependencyTree, 'react');
+	populateState(dependencyTree, "react");
 	return searchState;
 };
 /**
@@ -429,7 +468,7 @@ export const updateInternalQuery = (
 	value,
 	props,
 	defaultQueryToExecute,
-	queryParams,
+	queryParams
 ) => {
 	const { defaultQuery } = props;
 	let defaultQueryOptions;
@@ -479,16 +518,14 @@ export const extractQueryFromDefaultQuery = (props, value) => {
 };
 export const getAggsQuery = (value, query, props) => {
 	const clonedQuery = query;
-	const {
-		dataField, size, sortBy, showMissing, missingLabel,
-	} = props;
+	const { dataField, size, sortBy, showMissing, missingLabel } = props;
 	clonedQuery.size = 0;
 	clonedQuery.aggs = {
 		[dataField]: {
 			terms: {
 				field: dataField,
 				size,
-				order: getAggsOrder(sortBy || 'count'),
+				order: getAggsOrder(sortBy || "count"),
 				...(showMissing ? { missing: missingLabel } : {}),
 			},
 		},
@@ -506,18 +543,22 @@ export const getAggsQuery = (value, query, props) => {
 	}
 	return { ...clonedQuery, ...extractQueryFromDefaultQuery(props, value) };
 };
-export const getCompositeAggsQuery = (value, query, props, after, showTopHits = false) => {
+export const getCompositeAggsQuery = (
+	value,
+	query,
+	props,
+	after,
+	showTopHits = false
+) => {
 	const clonedQuery = query;
 	// missing label not available in composite aggs
-	const {
-		dataField, size, sortBy, showMissing, aggregationField,
-	} = props;
+	const { dataField, size, sortBy, showMissing, aggregationField } = props;
 
 	// first preference will be given to aggregationField
 	const finalField = aggregationField || dataField;
 
 	// composite aggs only allows asc and desc
-	const order = sortBy === 'count' ? {} : { order: sortBy };
+	const order = sortBy === "count" ? {} : { order: sortBy };
 
 	clonedQuery.aggs = {
 		[finalField]: {
@@ -538,12 +579,12 @@ export const getCompositeAggsQuery = (value, query, props, after, showTopHits = 
 			},
 			...(showTopHits
 				? {
-					aggs: {
-						[finalField]: {
-							top_hits: { size: 1 },
+						aggs: {
+							[finalField]: {
+								top_hits: { size: 1 },
+							},
 						},
-					},
-				}
+				  }
 				: {}),
 		},
 	};
@@ -571,9 +612,7 @@ export const withClickIds = (results = []) =>
 	}));
 
 export function getResultStats(props) {
-	const {
-		total, size, time, hidden, promotedResults,
-	} = props;
+	const { total, size, time, hidden, promotedResults } = props;
 	return {
 		numberOfResults: total,
 		...(size > 0 ? { numberOfPages: Math.ceil(total / size) } : null),
@@ -588,13 +627,15 @@ export function handleOnSuggestions(results, currentValue, props) {
 
 	let fields;
 	if (props.dataField) {
-		fields = Array.isArray(props.dataField) ? props.dataField : [props.dataField];
+		fields = Array.isArray(props.dataField)
+			? props.dataField
+			: [props.dataField];
 	} else if (
-		results
-		&& Array.isArray(results)
-		&& results.length > 0
-		&& results[0]
-		&& results[0]._source
+		results &&
+		Array.isArray(results) &&
+		results.length > 0 &&
+		results[0] &&
+		results[0]._source
 	) {
 		// Extract fields from _source
 		fields = Object.keys(results[0]._source);
@@ -606,9 +647,9 @@ export function handleOnSuggestions(results, currentValue, props) {
 	const parsedPromotedResults = parseHits(promotedResults, false);
 
 	if (parsedPromotedResults && parsedPromotedResults.length) {
-		const ids = parsedPromotedResults.map(item => item._id).filter(Boolean);
+		const ids = parsedPromotedResults.map((item) => item._id).filter(Boolean);
 		if (ids) {
-			newResults = newResults.filter(item => !ids.includes(item._id));
+			newResults = newResults.filter((item) => !ids.includes(item._id));
 		}
 		newResults = [...parsedPromotedResults, ...newResults];
 	}
@@ -621,16 +662,20 @@ export function handleOnSuggestions(results, currentValue, props) {
 	});
 
 	if (parseSuggestion) {
-		return parsedSuggestions.map(suggestion => parseSuggestion(suggestion));
+		return parsedSuggestions.map((suggestion) => parseSuggestion(suggestion));
 	}
 
 	return parsedSuggestions;
 }
 
-export const getTopSuggestions = (querySuggestions, currentValue = '', showDistinctSuggestions) => {
+export const getTopSuggestions = (
+	querySuggestions,
+	currentValue = "",
+	showDistinctSuggestions
+) => {
 	const parsedSuggestions = parseHits(querySuggestions, false);
 	const finalSuggestions = getSuggestions({
-		fields: ['key', 'key.autosuggest', 'key.search'],
+		fields: ["key", "key.autosuggest", "key.search"],
 		suggestions: parsedSuggestions || [],
 		currentValue: currentValue.toLowerCase(),
 		showDistinctSuggestions,

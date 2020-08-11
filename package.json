@@ -18,7 +18,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/appbaseio/reactivecore.git"
+		"url": "git+https://github.com/mitchgillin/reactivecore.git"
 	},
 	"author": "Deepak Grover <deepakgrover333@gmail.com> (https://github.com/metagrover)",
 	"license": "Apache-2.0",
